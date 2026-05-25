@@ -1,5 +1,328 @@
-<script>
-    // AJUSTADO A TUS 19 IMÁGENES
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <title>Leeresmuchomas - Plantilla de lectura</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0f1115;
+      --text:#e9eef7;
+      --btn:#243046;
+      --btn2:#2f4060;
+      --shadow:0 18px 60px rgba(0,0,0,.45);
+    }
+
+    *{ box-sizing:border-box; }
+
+    html, body{
+      margin:0;
+      width:100%;
+      min-height:100%;
+    }
+
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: radial-gradient(1200px 700px at 50% -10%, #1b2340 0%, var(--bg) 55%);
+      color:var(--text);
+      display:flex;
+      flex-direction:column;
+    }
+
+    header{
+      padding:14px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      position:sticky;
+      top:0;
+      z-index:50;
+      background: linear-gradient(to bottom, rgba(15,17,21,.92), rgba(15,17,21,.65));
+      backdrop-filter: blur(10px);
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+
+    .title{
+      font-weight:800;
+      font-size:14px;
+      line-height:1.2;
+    }
+
+    .controls{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    button{
+      border:0;
+      border-radius:12px;
+      padding:10px 12px;
+      background:var(--btn);
+      color:var(--text);
+      font-weight:800;
+      cursor:pointer;
+      transition: background .2s ease, transform .05s ease;
+      touch-action: manipulation;
+    }
+
+    button:hover{ background:var(--btn2); }
+    button:active{ transform: translateY(1px); }
+
+    .topTool{
+      min-width:44px;
+      height:44px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:0 14px;
+      font-size:18px;
+    }
+
+    main{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:14px;
+    }
+
+    .stage{
+      width:min(1100px,96vw);
+      height:min(720px,78vh);
+      background: rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      position:relative;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .stage:fullscreen{
+      width:100vw;
+      height:100vh;
+      border-radius:0;
+    }
+
+    .stage:-webkit-full-screen{
+      width:100vw;
+      height:100vh;
+      border-radius:0;
+    }
+
+    .stage.pseudo-full{
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      border-radius: 0 !important;
+      z-index: 9999 !important;
+      background: rgba(10,12,16,0.98);
+    }
+
+    #zoomViewport{
+      width:100%;
+      height:100%;
+      overflow:hidden;
+      position:relative;
+      touch-action:none;
+      cursor:grab;
+    }
+
+    #zoomViewport.grabbing{
+      cursor:grabbing;
+    }
+
+    #zoomWrap{
+      width:100%;
+      height:100%;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+
+    #book{
+      width:100%;
+      height:100%;
+    }
+
+    .page{
+      background:transparent;
+      position:relative;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .page img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      display:block;
+      background:transparent;
+      -webkit-user-drag:none;
+      user-select:none;
+      pointer-events:none;
+    }
+
+    .navInside{
+      position:absolute;
+      top:50%;
+      transform: translateY(-50%);
+      z-index:30;
+      width:44px;
+      height:44px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.25);
+      background: rgba(0,0,0,.35);
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:18px;
+      font-weight:900;
+      cursor:pointer;
+      user-select:none;
+      backdrop-filter: blur(8px);
+      touch-action: manipulation;
+      transition: opacity .2s ease, background .2s ease;
+    }
+
+    .navInside:hover{ background: rgba(0,0,0,.50); }
+    .navInside:active{ transform: translateY(-50%) scale(0.98); }
+
+    .navLeft{ left:14px; }
+    .navRight{ right:14px; }
+
+    .zoomBtns{
+      position:absolute;
+      left:14px;
+      bottom:14px;
+      z-index:35;
+      display:flex;
+      gap:8px;
+    }
+
+    .zoomBtn{
+      width:44px;
+      height:44px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.25);
+      background: rgba(0,0,0,.35);
+      color:#fff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-weight:900;
+      cursor:pointer;
+      user-select:none;
+      backdrop-filter: blur(8px);
+      touch-action: manipulation;
+      transition: opacity .2s ease, background .2s ease;
+    }
+
+    .zoomBtn:hover{ background: rgba(0,0,0,.50); }
+
+    .touch .navInside,
+    .touch .zoomBtns{
+      opacity:0;
+      pointer-events:none;
+    }
+
+    .touch.show-controls .navInside,
+    .touch.show-controls .zoomBtns{
+      opacity:.92;
+      pointer-events:auto;
+    }
+
+    #exitFullBtn{
+      position:absolute;
+      top:10px;
+      left:10px;
+      width:42px;
+      height:42px;
+      border-radius:10px;
+      background:rgba(0,0,0,.45);
+      color:#fff;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      font-size:20px;
+      font-weight:900;
+      cursor:pointer;
+      z-index:60;
+      backdrop-filter:blur(6px);
+    }
+
+    #exitFullBtn:hover{
+      background:rgba(0,0,0,.65);
+    }
+
+    .stage.pseudo-full #exitFullBtn{
+      display:flex;
+    }
+
+    .stage:fullscreen #exitFullBtn{
+      display:flex;
+    }
+
+    .stage:-webkit-full-screen #exitFullBtn{
+      display:flex;
+    }
+
+    @media (max-width: 1024px){
+      .navInside{ width:52px; height:52px; font-size:20px; }
+      .zoomBtn{ width:52px; height:52px; }
+      .topTool{ min-width:42px; height:42px; font-size:17px; }
+    }
+
+    @media (max-width: 680px){
+      .title{ font-size:12px; max-width:42vw; }
+      .topTool{ min-width:40px; height:40px; font-size:16px; padding:0 10px; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="title">Leeresmuchomas - Plantilla de lectura</div>
+
+    <div class="controls">
+      <button class="topTool" id="fullscreen">⛶</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="stage" id="stage">
+      <div id="exitFullBtn">✕</div>
+
+      <div class="navInside navLeft" id="prevInside">◀</div>
+      <div class="navInside navRight" id="nextInside">▶</div>
+
+      <div class="zoomBtns" id="zoomBtns">
+        <div class="zoomBtn" id="zoomOut">−</div>
+        <div class="zoomBtn" id="zoomIn">+</div>
+        <div class="zoomBtn" id="zoomReset">↺</div>
+      </div>
+
+      <div id="zoomViewport">
+        <div id="zoomWrap">
+          <div id="book"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
     const TOTAL = 19; 
 
     const stage = document.getElementById("stage");
@@ -12,9 +335,11 @@
     const isTouch = window.matchMedia("(hover: none), (pointer: coarse)").matches;
     if (isTouch) stage.classList.add("touch");
 
-    // MODIFICADO: Ahora busca archivos 1.jpg, 2.jpg, etc.
+    // AJUSTADO: Busca archivos como 1-01.jpg, 1-02.jpg...
     function nombrePagina(num){
-      return num + ".jpg";
+      let n = String(num);
+      if(num < 10) n = "0" + num;
+      return "1-" + n + ".jpg";
     }
 
     for(let i=1; i<=TOTAL; i++){
@@ -30,9 +355,7 @@
       book.appendChild(page);
     }
 
-    // Asegúrate de usar 'PageFlip' en lugar de 'St.PageFlip' 
-    // dependiendo de cómo cargue la librería en tu entorno
-    const pageFlip = new PageFlip.PageFlip(book,{
+    const pageFlip = new St.PageFlip(book,{
       width:520,
       height:700,
       size:"stretch",
@@ -53,8 +376,6 @@
     document.getElementById("prevInside").onclick = () => pageFlip.flipPrev();
     document.getElementById("nextInside").onclick = () => pageFlip.flipNext();
 
-    // ... (El resto de tu código de zoom y fullscreen queda igual)
-    
     let hideTimer = null;
     function showControlsTemporarily(){
       if(!isTouch) return;
@@ -241,6 +562,7 @@
     document.getElementById("zoomOut").onclick = () => zoomTo(scale - 0.25, window.innerWidth/2, window.innerHeight/2);
     document.getElementById("zoomReset").onclick = () => resetZoom();
 
+    /* Mouse drag SIEMPRE */
     viewport.addEventListener("mousedown", (e)=>{
       mouseDown = true;
       startX = e.clientX - tx;
@@ -268,8 +590,10 @@
       }
     });
 
+    /* Rueda del mouse para zoom */
     viewport.addEventListener("wheel", (e)=>{
       e.preventDefault();
+
       const delta = e.deltaY < 0 ? 0.15 : -0.15;
       zoomTo(scale + delta, e.clientX, e.clientY);
     }, { passive:false });
@@ -285,3 +609,5 @@
 
     applyTransform();
   </script>
+</body>
+</html>
