@@ -1,0 +1,287 @@
+<script>
+    // AJUSTADO A TUS 19 IMÁGENES
+    const TOTAL = 19; 
+
+    const stage = document.getElementById("stage");
+    const viewport = document.getElementById("zoomViewport");
+    const wrap = document.getElementById("zoomWrap");
+    const book = document.getElementById("book");
+    const fullBtn = document.getElementById("fullscreen");
+    const exitFullBtn = document.getElementById("exitFullBtn");
+
+    const isTouch = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    if (isTouch) stage.classList.add("touch");
+
+    // MODIFICADO: Ahora busca archivos 1.jpg, 2.jpg, etc.
+    function nombrePagina(num){
+      return num + ".jpg";
+    }
+
+    for(let i=1; i<=TOTAL; i++){
+      const page = document.createElement("div");
+      page.className = "page";
+
+      const img = document.createElement("img");
+      img.src = nombrePagina(i);
+      img.alt = "Página " + i;
+      img.loading = i <= 4 ? "eager" : "lazy";
+
+      page.appendChild(img);
+      book.appendChild(page);
+    }
+
+    // Asegúrate de usar 'PageFlip' en lugar de 'St.PageFlip' 
+    // dependiendo de cómo cargue la librería en tu entorno
+    const pageFlip = new PageFlip.PageFlip(book,{
+      width:520,
+      height:700,
+      size:"stretch",
+      minWidth:320,
+      maxWidth:1400,
+      minHeight:420,
+      maxHeight:1000,
+      showCover:true,
+      mobileScrollSupport:true,
+      useMouseEvents:true,
+      flippingTime:700,
+      swipeDistance:25
+    });
+
+    pageFlip.loadFromHTML(document.querySelectorAll(".page"));
+    pageFlip.flip(0);
+
+    document.getElementById("prevInside").onclick = () => pageFlip.flipPrev();
+    document.getElementById("nextInside").onclick = () => pageFlip.flipNext();
+
+    // ... (El resto de tu código de zoom y fullscreen queda igual)
+    
+    let hideTimer = null;
+    function showControlsTemporarily(){
+      if(!isTouch) return;
+      stage.classList.add("show-controls");
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => stage.classList.remove("show-controls"), 1000);
+    }
+
+    viewport.addEventListener("touchstart", showControlsTemporarily, {passive:true});
+    viewport.addEventListener("click", showControlsTemporarily);
+
+    function hasNativeFullscreen(){
+      return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+    }
+
+    function isNativeFullscreen(){
+      return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    async function requestNativeFullscreen(el){
+      if(el.requestFullscreen) return el.requestFullscreen();
+      if(el.webkitRequestFullscreen) return el.webkitRequestFullscreen();
+    }
+
+    async function exitNativeFullscreen(){
+      if(document.exitFullscreen) return document.exitFullscreen();
+      if(document.webkitExitFullscreen) return document.webkitExitFullscreen();
+    }
+
+    function isPseudoFullscreen(){
+      return stage.classList.contains("pseudo-full");
+    }
+
+    function enterPseudoFullscreen(){
+      stage.classList.add("pseudo-full");
+      document.body.style.overflow = "hidden";
+      setTimeout(()=>pageFlip.update(), 250);
+    }
+
+    function exitPseudoFullscreen(){
+      stage.classList.remove("pseudo-full");
+      document.body.style.overflow = "";
+      setTimeout(()=>pageFlip.update(), 250);
+    }
+
+    async function openFullscreen(){
+      try{
+        if(hasNativeFullscreen()){
+          if(!isNativeFullscreen()){
+            await requestNativeFullscreen(stage);
+            setTimeout(()=>pageFlip.update(), 250);
+            return;
+          }
+        } else {
+          enterPseudoFullscreen();
+        }
+      }catch(e){
+        enterPseudoFullscreen();
+      }
+    }
+
+    async function closeFullscreen(){
+      try{
+        if(document.fullscreenElement || document.webkitFullscreenElement){
+          if(document.exitFullscreen) await document.exitFullscreen();
+          if(document.webkitExitFullscreen) await document.webkitExitFullscreen();
+        }
+
+        if(stage.classList.contains("pseudo-full")){
+          exitPseudoFullscreen();
+        }
+      }catch(e){
+        exitPseudoFullscreen();
+      }
+    }
+
+    fullBtn.addEventListener("click", openFullscreen);
+    exitFullBtn.addEventListener("click", closeFullscreen);
+
+    document.addEventListener("fullscreenchange", ()=>setTimeout(()=>pageFlip.update(),150));
+    document.addEventListener("webkitfullscreenchange", ()=>setTimeout(()=>pageFlip.update(),150));
+
+    let scale = 1;
+    const minScale = 1;
+    const maxScale = 3;
+    let tx = 0, ty = 0;
+
+    let isPanning = false;
+    let startX = 0, startY = 0;
+    let pinchStartDist = 0;
+    let pinchStartScale = 1;
+    let pinchCenter = {x:0,y:0};
+    let mouseDown = false;
+
+    function clamp(v, a, b){
+      return Math.max(a, Math.min(b, v));
+    }
+
+    function applyTransform(){
+      wrap.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+      viewport.classList.toggle("grabbing", mouseDown);
+    }
+
+    function resetZoom(){
+      scale = 1;
+      tx = 0;
+      ty = 0;
+      applyTransform();
+    }
+
+    function zoomTo(newScale, cx, cy){
+      newScale = clamp(newScale, minScale, maxScale);
+
+      const rect = viewport.getBoundingClientRect();
+      const x = cx - rect.left;
+      const y = cy - rect.top;
+
+      const contentX = (x - tx) / scale;
+      const contentY = (y - ty) / scale;
+
+      scale = newScale;
+      tx = x - contentX * scale;
+      ty = y - contentY * scale;
+
+      applyTransform();
+    }
+
+    function distance(t1, t2){
+      const dx = t2.clientX - t1.clientX;
+      const dy = t2.clientY - t1.clientY;
+      return Math.hypot(dx, dy);
+    }
+
+    let lastTap = 0;
+    viewport.addEventListener("touchend", (e)=>{
+      const now = Date.now();
+      const dt = now - lastTap;
+      lastTap = now;
+
+      if(e.changedTouches && e.changedTouches.length === 1 && dt < 280){
+        const t = e.changedTouches[0];
+        if(scale > 1.01) resetZoom();
+        else zoomTo(2, t.clientX, t.clientY);
+        e.preventDefault();
+      }
+    }, {passive:false});
+
+    viewport.addEventListener("touchstart", (e)=>{
+      if(e.touches.length === 2){
+        pinchStartDist = distance(e.touches[0], e.touches[1]);
+        pinchStartScale = scale;
+        pinchCenter = {
+          x: (e.touches[0].clientX + e.touches[1].clientX)/2,
+          y: (e.touches[0].clientY + e.touches[1].clientY)/2
+        };
+        e.preventDefault();
+      }else if(e.touches.length === 1){
+        isPanning = true;
+        startX = e.touches[0].clientX - tx;
+        startY = e.touches[0].clientY - ty;
+      }
+    }, {passive:false});
+
+    viewport.addEventListener("touchmove", (e)=>{
+      if(e.touches.length === 2){
+        const d = distance(e.touches[0], e.touches[1]);
+        const factor = d / pinchStartDist;
+        zoomTo(pinchStartScale * factor, pinchCenter.x, pinchCenter.y);
+        e.preventDefault();
+      }else if(e.touches.length === 1 && isPanning){
+        tx = e.touches[0].clientX - startX;
+        ty = e.touches[0].clientY - startY;
+        applyTransform();
+        e.preventDefault();
+      }
+    }, {passive:false});
+
+    viewport.addEventListener("touchend", ()=>{
+      isPanning = false;
+      applyTransform();
+    });
+
+    document.getElementById("zoomIn").onclick = () => zoomTo(scale + 0.25, window.innerWidth/2, window.innerHeight/2);
+    document.getElementById("zoomOut").onclick = () => zoomTo(scale - 0.25, window.innerWidth/2, window.innerHeight/2);
+    document.getElementById("zoomReset").onclick = () => resetZoom();
+
+    viewport.addEventListener("mousedown", (e)=>{
+      mouseDown = true;
+      startX = e.clientX - tx;
+      startY = e.clientY - ty;
+      applyTransform();
+      e.preventDefault();
+    });
+
+    window.addEventListener("mousemove", (e)=>{
+      if(!mouseDown) return;
+      tx = e.clientX - startX;
+      ty = e.clientY - startY;
+      applyTransform();
+    });
+
+    window.addEventListener("mouseup", ()=>{
+      mouseDown = false;
+      applyTransform();
+    });
+
+    viewport.addEventListener("mouseleave", ()=>{
+      if(mouseDown){
+        mouseDown = false;
+        applyTransform();
+      }
+    });
+
+    viewport.addEventListener("wheel", (e)=>{
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.15 : -0.15;
+      zoomTo(scale + delta, e.clientX, e.clientY);
+    }, { passive:false });
+
+    let rT = null;
+    window.addEventListener("resize", ()=>{
+      clearTimeout(rT);
+      rT = setTimeout(()=>{
+        pageFlip.update();
+        applyTransform();
+      }, 250);
+    });
+
+    applyTransform();
+  </script>
